@@ -8,8 +8,15 @@ dotenv.config({
 });
 
 // 1st METHOD : do a separate file for db connect
-connectDB();
-
+connectDB() // this returns a promise, so handle it with "then" & "catch"
+  .then(() => {
+    app.listen(process.env.PORT || 8000, () => {
+      console.log(`Server running at port : ${process.env.PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.log("MONGO dB connection failed !!", error);
+  });
 /*
 // 2nd METHOD : DO EVERYTHING IN index.js
 import express from "express";

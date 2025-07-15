@@ -1,6 +1,7 @@
 // require("dotenv").config({ path: './env' });
 import dotenv from "dotenv";
 import connectDB from "./db/index.js";
+import { app } from "./app.js";
 
 // load environment variables from.env file
 dotenv.config({
@@ -17,6 +18,7 @@ connectDB() // this returns a promise, so handle it with "then" & "catch"
   .catch((error) => {
     console.log("MONGO dB connection failed !!", error);
   });
+
 /*
 // 2nd METHOD : DO EVERYTHING IN index.js
 import express from "express";

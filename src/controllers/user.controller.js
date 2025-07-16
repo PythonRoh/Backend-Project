@@ -18,7 +18,6 @@ const registerUser = asyncHandler(async (req, res) => {
   // ------------- fetch user details from request body -------------
   const { fullName, email, username, password } = req.body;
   // console.log("email: ", email);
-  // console.log("fullname: ", fullName);
 
   // ------------- validation of user details ---------------
   // check if any field is empty
@@ -51,10 +50,20 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // -------------- check for images and avatar from local storage (not in Cloudinary) --------------
   // multer stores the uploaded file in req.files
-  console.log("Files uploaded:", req.files);
+  // console.log("Files uploaded:", req.files);
 
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalPath = req.files?.coverImages[0]?.path;
+  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+
+  // to handle if the user has not uploaded a cover image
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
 
   // since in our db , avatar img was required : true,
   // we will check if avatar is present

@@ -19,7 +19,7 @@ router.route("/register").post(
       maxCount: 1, // only one avatar image
     },
     {
-      name: "coverImages",
+      name: "coverImage",
       maxCount: 1, // only one cover images
     },
   ]),

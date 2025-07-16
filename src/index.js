@@ -6,6 +6,7 @@ import { app } from "./app.js";
 // load environment variables from.env file
 dotenv.config({
   // path: ".env", // path to the.env file
+  path: "./.env", // path to the.env file
 });
 
 // 1st METHOD : do a separate file for db connect

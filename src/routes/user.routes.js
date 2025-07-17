@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   loginUser,
   logoutUser,
+  refreshAccessToken,
   registerUser,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -34,10 +35,16 @@ router.route("/register").post(
 // login route
 router.route("/login").post(loginUser);
 
-// secured routes ( middleware "verifyJWT" will be injected, ref : "src\middlewares\auth.middleware.js")
+// ---------- secured routes ----------
+
+// ( middleware "verifyJWT" will be injected, ref : "src\middlewares\auth.middleware.js")
 // what this does is when we send a request to "/logout", before getting a response frm logoutUser funct,
 // it will first check if the user is logged in or not, and then only proceed to logoutUser function
 // attaches a new user object to the request as req.user
 // so that we can know which user is trying to log out
 router.route("/logout").post(verifyJWT, logoutUser);
+
+// here middleware "verifyJWT" not required, becoz
+// we are not checking if the user is logged in or not, we just want to refresh the access token
+router.route("/refresh-token").post(refreshAccessToken);
 export default router;

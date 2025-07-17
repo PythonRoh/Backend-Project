@@ -4,6 +4,31 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
+// method to generate access and refresh token
+// ayncHandeler not required here, since function to be used in this scope only
+const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    const userResponse = await User.findById(userId);
+    const accessToken = userResponse.generateAccessToken();
+    const refreshToken = userResponse.generateRefreshToken();
+
+    // update the refresh token available in useResponse we get frm DB
+    // ( refresh token is an attribute in user DB )
+    userResponse.refreshToken = refreshToken;
+
+    // save the DB, but keep in mid to not run validation check for "required: true" field in user DB
+    await userResponse.save({ validateBeforeSave: false });
+
+    // return newly created access and refreshToken
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "Something went wrong while generating access and refresh tokens"
+    );
+  }
+};
+
 const registerUser = asyncHandler(async (req, res) => {
   // get user details from frontend
   // validation - not empty
@@ -108,4 +133,117 @@ const registerUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, createdUser, "User registered successfully"));
 });
 
-export { registerUser };
+const loginUser = asyncHandler(async (req, res) => {
+  // TODOS:
+  // fetch data from req.body
+  // search db via username or email for user
+  // if user found, check password frm user : else, throw error
+  // if password valid, provide access token & refresh token : else throw error
+  // finally, send a secure cookie and response (successfully logged in)
+
+  // ---------------- fetch data from req -------------------------
+  const { email, username, password } = req.body;
+
+  if (!username || !email) {
+    throw new ApiError(400, "username or email is required");
+  }
+
+  // ------------------ serach user from DB ------------------------
+  const userResponse = User.findOne({
+    $or: [{ username }, { email }],
+  });
+
+  // handle if user not present
+  if (!userResponse) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  // -------- check pw validity frm returned valid userResponse -------
+
+  // our returned userResponse has a method - isPasswordCorrect() that checks validity of pW (check "src\models\user.model.js" for more)
+  const isPasswordValid = await userResponse.isPasswordCorrect(password);
+
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid User credentials");
+  }
+
+  // ------------ generate access Token and Refresh Token --------------
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    userResponse._id
+  );
+
+  // -------------------- send response to user ---------------------
+  // why again called to db here ?
+  // earlier we made "userResponse" object by calling db, but there "refreshToken" attribute is still EMPTY since we are calling generateAccessAndRefreshTokens() later, so we call db again and omit password and refreshToken frm sendin to user
+
+  const loggedInUser = await User.findById(userResponse._id).select(
+    "-password -refreshToken"
+  );
+
+  // ------------------ send cookies ---------------------
+  // by httpOnly true and secure true, cookie is only modifiable via server, not by frontEnd
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  // ------------------- send response to user ---------------------
+  // cookie-parser middleware used here ( refer "src\app.js" )
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        "User logged In Successfully"
+      )
+    );
+});
+
+const logoutUser = asyncHandler(async (req, res) => {
+  // TODOS:
+  // clear cookies since logging-Out the user
+  // clear "refreshToken" present user.models since logging-Out
+  // BUT, how to get the info of which user to delete
+  // We can't take request frm user for doing that, accessing this might give some other user's email, who can be mistakenly logged off
+
+  // --- NOTE : below code is written only after a custom middleware "verifyJWT" is created in "src\middlewares\auth.middleware.js"
+  // and this middleware is integrated to route Query for "/logout" in "src\routes\user.routes.js"
+
+  // search and update the required user DB before logging out
+  await User.findByIdAndUpdate(
+    // req.user is the user object we added in "verifyJWT" middleware
+    // this is the user who is trying to log out
+    req.user._id,
+    {
+      $set: {
+        // refreshToken attribute frm "user.models.js" is set undefined
+        refreshToken: undefined,
+      },
+    },
+    {
+      // return response is new updated value
+      new: true,
+    }
+  );
+
+  // clear cookies
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged Out Successfully"));
+});
+
+export { registerUser, loginUser, logoutUser };

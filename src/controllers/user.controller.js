@@ -314,4 +314,224 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     );
   }
 });
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  // TODO:
+  // here we don't have to confirm if user is logged in or not, cokkies available or not, THIS will be handeled at routes itself with the verifyJWT middleware we custom created
+  // now, we want user so that we can change incomming pw with db stored pw
+  // for that we need user info, that we will be getting from "verifyJWT" middleware (src\middlewares\auth.middleware.js)
+
+  const { oldPassword, newPassword } = req.body;
+  const user = await User.findById(req.user?._id);
+
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+
+  if (!isPasswordCorrect) {
+    throw new ApiError(400, "Invalid old password");
+  }
+
+  user.password = newPassword;
+
+  // before this save a pre-hook will be run, (ref "user.models.js", or check screenshots), which will encrypt "newPassword" before saving in DB
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully"));
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  //TODO:
+  // this is realtively easy
+  // hame bass current user details chahiye
+  // simply return req.user as a response (user frm "verifyJWT" ref: "src\middlewares\auth.middleware.js")
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "current user fetched successfully"));
+});
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  //TODO:
+  // fetch details from req.body
+  // fetch user frm db nd update via "findByIdAndUpdate()"
+  // set fullName and email by $set operator
+  // set new : true, to give updated user details
+  // send response to user
+  const { fullName, email } = req.body;
+
+  if (!(fullName || email)) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user?.id,
+    {
+      // mongodb operator used $set
+      // update the user details
+      $set: {
+        fullName,
+        email,
+      },
+    },
+    {
+      // this enables updated user DB to be returned to user durin res
+      // user details stored in "updatedUser" variable
+      new: true,
+    }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, updatedUser, "Account details updated successfully")
+    );
+});
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  // TODO:
+  // fetch avatar frm req.files
+  // check if avatar is present or not, throw error if not
+  // upload avatar to cloudinary
+  // update user avatar in db via findByIdAndUpdate()
+  // set new : true, to give updated user details
+  // send response to user
+
+  const avatarLocalPath = req.file?.path;
+
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar file is missing");
+  }
+
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+
+  if (!avatar.url) {
+    throw new ApiError(
+      400,
+      "Error while uploading updated Avatar on Cloudinary"
+    );
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        avatar: avatar.url,
+      },
+    },
+    {
+      new: true,
+    }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "Avatar changed successfully"));
+});
+
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  // TODO:
+  // fetch CoverImage frm req.files
+  // check if CoverImage is present or not, throw error if not
+  // upload CoverImage to cloudinary
+  // update user CoverImage in db via findByIdAndUpdate()
+  // set new : true, to give updated user details
+  // send response to user
+
+  const coverImageLocalPath = req.file?.path;
+
+  if (!coverImageLocalPath) {
+    throw new ApiError(400, "coverImage file is missing");
+  }
+
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+
+  if (!coverImage.url) {
+    throw new ApiError(
+      400,
+      "Error while uploading updated coverImage on Cloudinary"
+    );
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        coverImage: coverImage.url,
+      },
+    },
+    {
+      new: true,
+    }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "coverImage changed successfully"));
+});
+
+// this is an experiment , but its 100% correct :
+// idea is to give access to user to changeUsername, but it has to be unique, not used by anyone else
+const changeUsername = asyncHandler(async (req, res) => {
+  //TODO:
+  // "newUsername" lelo req se (req.body)
+  // validate id newUsername given correct or not
+  // tho check karo ki ye "newUsername" db meinexist na kare
+  // IMPT : await User.findOne({username: newUsername}); this will return the user object matching "newUsename"
+  // if user object exists, throw error
+  // if not, fetch the user details frm the one requesting  it (using verifyJWT which added user object to req {req.user})
+  // fetch cuurent user obj frm db, via findByid(req.user._id)
+  // then simply update the username( user.username = newUsername)
+  // send response
+
+  const { newUsername } = req.body;
+
+  // 1. Check if the new username is provided
+  if (!newUsername || newUsername.trim() === "") {
+    throw new ApiError(400, "New username is required");
+  }
+
+  // 2. Check if username already exists in DB (case-insensitive optional)
+  const usernameExists = await User.findOne({ username: newUsername });
+
+  // 3. If exists and it's not the current user, throw error
+  if (
+    usernameExists &&
+    usernameExists._id.toString() !== req.user._id.toString()
+  ) {
+    throw new ApiError(400, "Username already taken");
+  }
+
+  // 4. Find current user
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // 5. Update and save
+  user.username = newUsername;
+  await user.save({ validateBeforeSave: false }); // optionally skip validation
+
+  // 6. Response
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { username: user.username },
+        "Username updated successfully"
+      )
+    );
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateAccountDetails,
+  updateUserAvatar,
+  updateUserCoverImage,
+};

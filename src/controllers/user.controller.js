@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 
 // method to generate access and refresh token
@@ -223,9 +224,9 @@ const logoutUser = asyncHandler(async (req, res) => {
     // this is the user who is trying to log out
     req.user._id,
     {
-      $set: {
-        // refreshToken attribute frm "user.models.js" is set undefined
-        refreshToken: undefined,
+      $unset: {
+        //  unset the refreshToken field in user DB
+        refreshToken: 1,
       },
     },
     {
@@ -472,6 +473,165 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedUser, "coverImage changed successfully"));
 });
 
+// mongoDB aggregation pipeline to get user channel profile
+// this will return the user profile with subscribers count, channels subscribed to count, and whether the current user is subscribed to the channel or not
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  // username is passed as a parameter in the request
+  const { username } = req.params;
+
+  if (!username?.trim()) {
+    throw new ApiError(400, "Username is missing");
+  }
+
+  const channel = await User.aggregate([
+    {
+      // pipeline 1
+      // match stage to filter users by username
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+    {
+      // pipeline 2
+      // lookup stage to join with subscriptions collection
+      // this will get the subscribers of the channel
+      $lookup: {
+        from: "subscriptions", // collection to join
+        localField: "_id", // field from the input documents
+        foreignField: "channel", // field from the documents of the "from" collection
+        as: "subscribers", // output array field
+      },
+    },
+    {
+      // pipeline 3
+      // lookup stage to join with subscriptions collection again
+      // this time to get the channels the user is subscribed to
+      $lookup: {
+        from: "subscriptions", // collection to join
+        localField: "_id", // field from the input documents
+        foreignField: "subscriber", // field from the documents of the "from" collection
+        as: "subscribedTo", // output array field
+      },
+    },
+    {
+      // pipeline 4
+      // addFields stage to add additional fields to the output documents
+
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers", // count of subscribers
+        },
+        channelsSubscribeToCount: {
+          $size: "$subscribedTo", // count of channels subscribed to
+        },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] }, // check if current user is in subscribers
+            then: true, // user is subscribed
+            else: false, // user is not subscribed
+          },
+        },
+      },
+    },
+    {
+      // pipeline 5
+      // project stage to include only necessary fields in the output
+      $project: {
+        // project stage to include only necessary fields in the output
+        fullName: 1,
+        username: 1,
+        avatar: 1,
+        coverImage: 1,
+        subscribersCount: 1,
+        channelsSubscribeToCount: 1,
+        isSubscribed: 1,
+        email: 1,
+      },
+    },
+  ]);
+
+  if (!channel?.length) {
+    throw new ApiError(404, "Channel does not exist");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, channel[0], "User channel fetched successfully")
+    );
+});
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+  // TODO:
+  // get the watch history of the user
+  // watchHistory is an array of video IDs in the user model
+  // we will use aggregation to get the video details from the video collection
+
+  const user = await User.aggregate([
+    {
+      // pipeline 1
+      // match stage to filter user by ID
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      },
+    },
+    {
+      // pipeline 2
+      // lookup stage to join watchHistory with videos collection
+      // this will get the video details for each video ID in watchHistory
+      $lookup: {
+        from: "videos", // from videos schema,
+        localField: "watchHistory", // filed in user schema, array of video IDs
+        foreignField: "_id", // field in videos schema
+        as: "watchHistory", // any name you want to give to the output array
+        pipeline: [
+          {
+            // sub-pipeline 1
+            // to join the owner field in video db with user details
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  // sub-sub-pipeline 1
+                  // to project only necessary fields from user into owner field of video db
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            // sub-pipeline 2
+            // to add the owner field to the video details
+            // this will give us the owner details in the video object
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user[0].watchHistory,
+        "Watch history fetched successfully"
+      )
+    );
+});
+
 // this is an experiment , but its 100% correct :
 // idea is to give access to user to changeUsername, but it has to be unique, not used by anyone else
 const changeUsername = asyncHandler(async (req, res) => {
@@ -538,4 +698,6 @@ export {
   updateUserAvatar,
   updateUserCoverImage,
   changeUsername,
+  getUserChannelProfile,
+  getWatchHistory,
 };

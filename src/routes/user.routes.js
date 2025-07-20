@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   changeCurrentPassword,
+  changeUsername,
   getCurrentUser,
   getUserChannelProfile,
   getWatchHistory,
@@ -54,9 +55,10 @@ router.route("/logout").post(verifyJWT, logoutUser);
 // here middleware "verifyJWT" not required, becoz
 // we are not checking if the user is logged in or not, we just want to refresh the access token
 router.route("/refresh-token").post(refreshAccessToken);
-router.route("/change-password").post(verifyJWT, changeCurrentPassword);
 router.route("/current-user").get(verifyJWT, getCurrentUser);
+router.route("/change-username").post(verifyJWT, changeUsername);
 router.route("/update-account").patch(verifyJWT, updateAccountDetails);
+router.route("/change-password").post(verifyJWT, changeCurrentPassword);
 
 // here first we will check if the user is logged in or not using "verifyJWT" middleware
 // then we will use multer middleware to handle file uploads
@@ -68,7 +70,7 @@ router
   .patch(verifyJWT, upload.single("coverImage"), updateUserCoverImage);
 
 // the callback function "getUserChannelProfile" will use the username from the URL
-// to get the user details from the database 
+// to get the user details from the database
 router.route("/c/:username").get(verifyJWT, getUserChannelProfile);
 router.route("/history").get(verifyJWT, getWatchHistory);
 export default router;

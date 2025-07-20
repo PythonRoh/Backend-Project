@@ -288,6 +288,10 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     const { accessToken, newRefreshToken } =
       await generateAccessAndRefreshTokens(user._id);
 
+    // 🔐 Save the new refresh token to DB
+    user.refreshToken = newRefreshToken;
+    await user.save({ validateBeforeSave: false });
+
     // set "option" for new cookie since NEW TOKENS will be sent to user via cookie
     const options = {
       httpOnly: true,
@@ -323,6 +327,7 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
   // for that we need user info, that we will be getting from "verifyJWT" middleware (src\middlewares\auth.middleware.js)
 
   const { oldPassword, newPassword } = req.body;
+
   const user = await User.findById(req.user?._id);
 
   const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
@@ -375,7 +380,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
       },
     },
     {
-      // this enables updated user DB to be returned to user durin res
+      // this enables updated user DB to be returned to user while sending response
       // user details stored in "updatedUser" variable
       new: true,
     }

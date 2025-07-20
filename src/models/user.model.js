@@ -61,6 +61,10 @@ const userSchema = new Schema(
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
+  if (!this.password) {
+    return next(new Error("Password is undefined before hashing."));
+  }
+
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });
@@ -70,7 +74,6 @@ userSchema.methods.isPasswordCorrect = async function (password) {
   // bcrypt.compare(plaintext, hashed) is a method that compares the plaintext password with the hashed password.
   return await bcrypt.compare(password, this.password);
 };
-
 
 // Generate an access token for a user
 userSchema.methods.generateAccessToken = function () {

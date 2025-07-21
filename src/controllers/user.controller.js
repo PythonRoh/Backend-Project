@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
@@ -99,7 +99,9 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   // -------------- upload images to Cloudinary --------------
-  const avatarResponse = await uploadOnCloudinary(avatarLocalPath);
+  const avatarResponse = await uploadOnCloudinary(avatarLocalPath).catch(
+    (error) => console.log(error)
+  );
   const coverImageResponse = coverImageLocalPath
     ? await uploadOnCloudinary(coverImageLocalPath)
     : null;
@@ -112,8 +114,14 @@ const registerUser = asyncHandler(async (req, res) => {
   // -------------- create user object and save to database --------------
   const user = await User.create({
     fullName,
-    avatar: avatarResponse.url, // store the secure URL of the avatar
-    coverImage: coverImageResponse ? coverImageResponse.url : null, // store the secure URL of the cover image
+    avatar: {
+      public_id: avatarResponse.public_id,
+      url: avatarResponse.secure_url,
+    },
+    coverImage: {
+      public_id: coverImageResponse?.public_id || "",
+      url: coverImageResponse?.secure_url || "",
+    },
     email,
     password, // password will be hashed by mongoose pre-save hook
     username: username.toLowerCase(), // store username in lowercase
@@ -420,17 +428,28 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     );
   }
 
+  const user = await User.findById(req.user._id).select("avatar");
+
+  const avatarToDelete = user.avatar.public_id;
+
   const updatedUser = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
-        avatar: avatar.url,
+        avatar: {
+          public_id: avatar.public_id,
+          url: avatar.secure_url,
+        },
       },
     },
     {
       new: true,
     }
   ).select("-password -refreshToken");
+
+  if (avatarToDelete && updatedUser.avatar.public_id) {
+    await deleteOnCloudinary(avatarToDelete);
+  }
 
   return res
     .status(200)
@@ -461,17 +480,28 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     );
   }
 
+  const user = await User.findById(req.user._id).select("coverImage");
+
+  const coverImageToDelete = user.coverImage.public_id;
+
   const updatedUser = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
-        coverImage: coverImage.url,
+        coverImage: {
+          public_id: coverImage.public_id,
+          url: coverImage.secure_url,
+        },
       },
     },
     {
       new: true,
     }
   ).select("-password -refreshToken");
+
+  if (coverImageToDelete && updatedUser.coverImage.public_id) {
+    await deleteOnCloudinary(coverImageToDelete);
+  }
 
   return res
     .status(200)

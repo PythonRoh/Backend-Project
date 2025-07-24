@@ -4,9 +4,9 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
+// toggle like on video
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: toggle like on video
 
   // checks whether a value is syntactically valid as a MongoDB ObjectId
   if (!isValidObjectId(videoId)) {
@@ -33,9 +33,9 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, { isLiked: true }));
 });
 
+// toggle like on comment
 const toggleCommentLike = asyncHandler(async (req, res) => {
   const { commentId } = req.params;
-  //TODO: toggle like on comment
 
   // checks whether a value is syntactically valid as a MongoDB ObjectId
   if (!isValidObjectId(commentId)) {
@@ -62,9 +62,9 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, { isLiked: true }));
 });
 
+// toggle like on tweet
 const toggleTweetLike = asyncHandler(async (req, res) => {
   const { tweetId } = req.params;
-  //TODO: toggle like on tweet
 
   // checks whether a value is syntactically valid as a MongoDB ObjectId
   if (!isValidObjectId(tweetId)) {
@@ -91,15 +91,19 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, { isLiked: true }));
 });
 
+// get all liked videos (--- MongoDB aggregation pipeline ---)
 const getLikedVideos = asyncHandler(async (req, res) => {
-  //TODO: get all liked videos
   const likedVideosAggregate = await Like.aggregate([
     {
+      // pipeline 1
+      // filter likes to only those that are liked by the current user
       $match: {
         likedBy: new mongoose.Types.ObjectId(req.user?._id),
       },
     },
     {
+      // pipeline 2
+      // lookup to get the video details for each like
       $lookup: {
         from: "videos",
         localField: "video",
@@ -107,6 +111,8 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         as: "likedVideo",
         pipeline: [
           {
+            // sub-pipeline 1
+            // lookup to get the owner details of the video
             $lookup: {
               from: "users",
               localField: "owner",
@@ -115,20 +121,28 @@ const getLikedVideos = asyncHandler(async (req, res) => {
             },
           },
           {
+            // sub-pipeline 2
+            // unwind the ownerDetails array to get a single object
             $unwind: "$ownerDetails",
           },
         ],
       },
     },
     {
+      // pipeline 3
+      // unwind the likedVideo array to get individual video documents
       $unwind: "$likedVideo",
     },
     {
+      // pipeline 4
+      // sort the liked videos by createdAt in descending order
       $sort: {
         createdAt: -1,
       },
     },
     {
+      // pipeline 5
+      // project the fields we want to return
       $project: {
         _id: 0,
         likedVideo: {

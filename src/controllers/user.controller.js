@@ -412,28 +412,30 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
   const avatarLocalPath = req.file?.path;
 
+  // VALIDATE FILE UPLOAD
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar file is missing");
   }
 
-  // ******* TODO: delete old avatar from cloudinary ********
-  // (probably will need a new utility function)
-
-  const avatar = await uploadOnCloudinary(avatarLocalPath);
-
-  if (!avatar.url) {
-    throw new ApiError(
-      400,
-      "Error while uploading updated Avatar on Cloudinary"
-    );
-  }
-
+  // FIND USER & CHECK IF OLD AVATAR EXISTS
   const user = await User.findById(req.user._id).select("avatar");
 
-  const avatarToDelete = user.avatar.public_id;
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
 
+  const oldAvatarPublicId = user.avatar?.public_id;
+
+  // UPLOAD NEW AVATAR TO CLOUDINARY
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+
+  if (!avatar?.secure_url || !avatar?.public_id) {
+    throw new ApiError(400, "Error uploading new avatar to Cloudinary");
+  }
+
+  // UPDATE USER WITH NEW AVATAR
   const updatedUser = await User.findByIdAndUpdate(
-    req.user?._id,
+    req.user._id,
     {
       $set: {
         avatar: {
@@ -442,18 +444,17 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         },
       },
     },
-    {
-      new: true,
-    }
+    { new: true }
   ).select("-password -refreshToken");
 
-  if (avatarToDelete && updatedUser.avatar.public_id) {
-    await deleteOnCloudinary(avatarToDelete);
+  // DELETE OLD AVATAR FROM CLOUDINARY (if any)
+  if (oldAvatarPublicId) {
+    await deleteOnCloudinary(oldAvatarPublicId);
   }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, updatedUser, "Avatar changed successfully"));
+    .json(new ApiResponse(200, updatedUser, "Avatar updated successfully"));
 });
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
@@ -465,47 +466,54 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   // set new : true, to give updated user details
   // send response to user
 
+  // EXTRACT LOCAL FILE PATH
   const coverImageLocalPath = req.file?.path;
 
+  // VALIDATE FILE EXISTENCE
   if (!coverImageLocalPath) {
-    throw new ApiError(400, "coverImage file is missing");
+    throw new ApiError(400, "Cover image file is missing");
   }
 
-  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+  // UPLOAD TO CLOUDINARY
+  const uploadedImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  if (!coverImage.url) {
-    throw new ApiError(
-      400,
-      "Error while uploading updated coverImage on Cloudinary"
-    );
+  if (!uploadedImage?.secure_url) {
+    throw new ApiError(400, "Failed to upload cover image to Cloudinary");
   }
 
-  const user = await User.findById(req.user._id).select("coverImage");
+  // FETCH USER
+  const user = await User.findById(req.user?._id).select("coverImage");
 
-  const coverImageToDelete = user.coverImage.public_id;
-
-  const updatedUser = await User.findByIdAndUpdate(
-    req.user?._id,
-    {
-      $set: {
-        coverImage: {
-          public_id: coverImage.public_id,
-          url: coverImage.secure_url,
-        },
-      },
-    },
-    {
-      new: true,
-    }
-  ).select("-password -refreshToken");
-
-  if (coverImageToDelete && updatedUser.coverImage.public_id) {
-    await deleteOnCloudinary(coverImageToDelete);
+  if (!user) {
+    throw new ApiError(404, "User not found");
   }
+
+  // STORE OLD COVER IMAGE PUBLIC_ID FOR DELETION
+  const oldCoverPublicId = user.coverImage?.public_id;
+
+  // UPDATE USER IN DB
+  user.coverImage = {
+    public_id: uploadedImage.public_id,
+    url: uploadedImage.secure_url,
+  };
+
+  await user.save({ validateBeforeSave: false });
+
+  // DELETE OLD COVER FROM CLOUDINARY (IF EXISTS)
+  if (oldCoverPublicId) {
+    await deleteOnCloudinary(oldCoverPublicId);
+  }
+
+  // SANITIZE USER OBJECT FOR RESPONSE
+  const updatedUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
 
   return res
     .status(200)
-    .json(new ApiResponse(200, updatedUser, "coverImage changed successfully"));
+    .json(
+      new ApiResponse(200, updatedUser, "Cover image updated successfully")
+    );
 });
 
 // mongoDB aggregation pipeline to get user channel profile

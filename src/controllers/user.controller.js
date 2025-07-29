@@ -193,9 +193,11 @@ const loginUser = asyncHandler(async (req, res) => {
   // ------------------ send cookies ---------------------
   // by httpOnly true and secure true, cookie is only modifiable via server, not by frontEnd
   const options = {
-    httpOnly: true,
-    secure: true,
-  };
+  httpOnly: true,
+  secure: true,
+  sameSite: "None", // ✅ Add this
+};
+
 
   // ------------------- send response to user ---------------------
   // cookie-parser middleware used here ( refer "src\app.js" )
@@ -245,9 +247,11 @@ const logoutUser = asyncHandler(async (req, res) => {
 
   // clear cookies
   const options = {
-    httpOnly: true,
-    secure: true,
-  };
+  httpOnly: true,
+  secure: true,
+  sameSite: "None", // ✅ Add this
+};
+
 
   return res
     .status(200)
@@ -302,9 +306,11 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
     // set "option" for new cookie since NEW TOKENS will be sent to user via cookie
     const options = {
-      httpOnly: true,
-      secure: true,
-    };
+  httpOnly: true,
+  secure: true,
+  sameSite: "None", // ✅ Add this
+};
+
 
     return res
       .status(200)

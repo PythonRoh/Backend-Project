@@ -5,10 +5,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon -r dotenv/config --experimental-json-modules src/index.js"
+    "dev": "nodemon -r dotenv/config --experimental-json-modules src/index.js",
+    "start": "node --experimental-json-modules --env-file=.env src/index.js"
   },
   "keywords": [
-    "javascrip",
+    "javascript",
     "backend"
   ],
   "author": "Rohit Rout",

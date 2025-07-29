@@ -12,6 +12,7 @@ and also combines the tweet functionality from twitter into it. Find more about 
 | -------------------| ----------------------------------------------------------------------------|
 | API Documentation  | [click here](https://documenter.getpostman.com/view/40434150/2sB34oBx3y)    |
 | Model              | [click here ](https://app.eraser.io/workspace/R5EbbpCE4X909WXQ28xL?origin=share)         |
+| Final Project Link              | [click here ](https://vidtube-frontend-alpha.vercel.app/)         |
 
 ## Features
 

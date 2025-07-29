@@ -1,23 +1,21 @@
-// require("dotenv").config({ path: './env' });
 import dotenv from "dotenv";
 import connectDB from "./db/index.js";
 import { app } from "./app.js";
 
-// load environment variables from.env file
-dotenv.config({
-  // path: ".env", // path to the.env file
-  path: "./.env", // path to the.env file
-});
+// Load environment variables
+dotenv.config({ path: "./.env" });
 
-// 1st METHOD : do a separate file for db connect
-connectDB() // this returns a promise, so handle it with "then" & "catch"
+// Start server after DB connects
+connectDB()
   .then(() => {
-    app.listen(process.env.PORT || 8000, () => {
-      console.log(`Server running at port : ${process.env.PORT}`);
+    const PORT = process.env.PORT || 8000;
+
+    app.listen(PORT, () => {
+      console.log(`✅ Server running at port: ${PORT}`);
     });
   })
   .catch((error) => {
-    console.log("MONGO dB connection failed !!", error);
+    console.error("❌ MongoDB connection failed:", error);
   });
 
 /*

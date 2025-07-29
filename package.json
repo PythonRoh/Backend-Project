@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon -r dotenv/config --experimental-json-modules src/index.js",
-    "start": "node --experimental-json-modules --env-file=.env src/index.js"
+    "start": "node --experimental-json-modules -r dotenv/config src/index.js"
   },
   "keywords": [
     "javascript",

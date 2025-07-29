@@ -5,20 +5,9 @@ const app = express();
 
 // app.use() -> to apply middleware to requests/responses cycles
 //           -> allows us to use middleware like cors, cookie-parser, etc.
-const allowedOrigins = [
-  "https://vidtube-frontend-alpha.vercel.app", // ✅ your deployed frontend
-  "http://localhost:5173", // ✅ your local dev environment
-];
-
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: process.env.CORS_ORIGIN,
     credentials: true,
   })
 );
